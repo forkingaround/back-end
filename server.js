@@ -2,6 +2,8 @@ const express = require('express');
 const knex = require('knex');
 const path = require('path');
 const cors = require('cors');
+const multer = require('multer');
+const serverUrl = 'http://localhost:5000';
 
 const app = express();
 app.use(cors());
@@ -23,7 +25,28 @@ const db = knex({
 
 // Serve static files from the "assets" folder
 app.use('/images', express.static(path.join(__dirname, 'assets/images')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/static', express.static(path.join(__dirname, 'static')));
 
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        // Specify the destination folder to save the uploaded files
+        cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+        // Generate a unique filename for the uploaded file
+        const uniqueFilename = Date.now() + '-' + file.originalname;
+        cb(null, uniqueFilename);
+    },
+});
+const upload = multer({ storage });
+
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+    // File has been uploaded and saved, perform any additional logic here
+    const imageUrl = `${serverUrl}/uploads/${req.file.filename}`;
+    const insertedId = await db('images').insert({ url: imageUrl }).returning('id');//insertedId[0].id
+    res.status(200).json({ link: imageUrl });
+});
 /*
 // Create a route that will return your data
 app.get('/data', (req, res) => {
@@ -100,7 +123,9 @@ app.get('/project', async (req, res) => {
         console.log('retrieved:', result);
         const projectTitle = result[0].title;
         const teaserText = result[0].teaser;
-        res.json({ id: projectId, title: projectTitle, teaser: teaserText });
+        const causesArr = result[0].causes;
+        const mainImage = result[0].main_image;
+        res.json({ id: projectId, title: projectTitle, teaser: teaserText, causes: causesArr, main_image: mainImage});
 
     } catch (error) {
         console.error('Error retrieving image URL:', error);
